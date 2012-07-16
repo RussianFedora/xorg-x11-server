@@ -1,0 +1,57 @@
+From 282b121d3def9e3cf34c9e35b0b8728ae1a7e42b Mon Sep 17 00:00:00 2001
+From: Daniel Kurtz <djkurtz@chromium.org>
+Date: Mon, 8 Aug 2011 15:09:47 +0800
+Subject: [PATCH 3/3] xf86Helper: use LogHdrMessageVerb in xf86VIDrvMsgVerb
+
+LogHdrMessageVerb allows passing a parameterized header to insert in a log
+message between MessageType and the formatted message body string.
+
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+Reviewed-by: Peter Hutterer <peter.hutterer@who-t.net>
+Signed-off-by: Peter Hutterer <peter.hutterer@who-t.net>
+(cherry picked from commit cd8ee3e5cb29b9cd6402d2fbc71463c6b04b6077)
+---
+ hw/xfree86/common/xf86Helper.c |   23 +++++++++++++----------
+ 1 files changed, 13 insertions(+), 10 deletions(-)
+
+diff --git a/hw/xfree86/common/xf86Helper.c b/hw/xfree86/common/xf86Helper.c
+index f8e6c8b..f42d0f9 100644
+--- a/hw/xfree86/common/xf86Helper.c
++++ b/hw/xfree86/common/xf86Helper.c
+@@ -1082,20 +1082,23 @@ xf86DrvMsg(int scrnIndex, MessageType type, const char *format, ...)
+ }
+ 
+ /* Print input driver messages in the standard format of
+-   <driver>: <device name>: <message> */
++   (<type>) <driver>: <device name>: <message> */
+ void
+-xf86VIDrvMsgVerb(InputInfoPtr dev, MessageType type, int verb, const char *format,
+-		 va_list args)
++xf86VIDrvMsgVerb(InputInfoPtr dev, MessageType type, int verb,
++		 const char *format, va_list args)
+ {
+-    char *msg;
++    const char *driverName = NULL;
++    const char *deviceName = NULL;
+ 
+-    if (asprintf(&msg, "%s: %s: %s", dev->drv->driverName, dev->name, format)
+-	== -1) {
+-	LogVMessageVerb(type, verb, "%s", args);
+-    } else {
+-	LogVMessageVerb(type, verb, msg, args);
+-	free(msg);
++    /* Prefix driver and device names to formatted message. */
++    if (dev) {
++	deviceName = dev->name;
++	if (dev->drv)
++	    driverName = dev->drv->driverName;
+     }
++
++    LogHdrMessageVerb(type, verb, format, args, "%s: %s: ", driverName,
++	deviceName);
+ }
+ 
+ /* Print input driver message, with verbose level specified directly */
+-- 
+1.7.7.6
+

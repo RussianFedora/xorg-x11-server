@@ -9,46 +9,28 @@
 # check out the master branch, pull, cherry-pick, and push.  FIXME describe
 # rebasing, add convenience 'make' targets maybe.
 
-#define gitdate 20120215
-%define stable_abi 1
+# TODO list:
+#
+# Fix rhpxl to no longer need vesamodes/extramodes
 
-%if !0%{?gitdate} || %{stable_abi}
-
-# Released ABI versions.  Have to keep these manually in sync with the
-# source because rpm is a terrible language.
-
+# ABI versions.  Have to keep these manually in sync with the source
+# because rpm is a terrible language.  HTFU.
 %define ansic_major 0
 %define ansic_minor 4
-%define videodrv_major 12
+%define videodrv_major 11
 %define videodrv_minor 0
-%define xinput_major 16
+%define xinput_major 13
 %define xinput_minor 0
 %define extension_major 6
 %define extension_minor 0
 
-%else
-
-# For git snapshots, use date for major and a serial number for minor
-
-%define minor_serial 0
-
-%define ansic_major %{gitdate}
-%define ansic_minor %{minor_serial}
-%define videodrv_major %{gitdate}
-%define videodrv_minor %{minor_serial}
-%define xinput_major %{gitdate}
-%define xinput_minor %{minor_serial}
-%define extension_major %{gitdate}
-%define extension_minor %{minor_serial}
-
-%endif
-
 %define pkgname xorg-server
+#define gitdate 20110818
 
 Summary:   X.Org X11 X server
 Name:      xorg-x11-server
-Version:   1.12.2
-Release:   4%{?gitdate:.%{gitdate}}%{dist}
+Version:   1.11.4
+Release:   3%{?gitdate:.%{gitdate}}%{dist}
 URL:       http://www.x.org
 License:   MIT
 Group:     User Interface/X
@@ -73,11 +55,7 @@ Source10:   xserver.pamd
 Source20:  http://svn.exactcode.de/t2/trunk/package/xorg/xorg-server/xvfb-run.sh
 
 # for requires generation in drivers
-Source30: xserver-sdk-abi-requires.release
-Source31: xserver-sdk-abi-requires.git
-
-# maintainer convenience script
-Source40: driver-abi-rebuild.sh
+Source30:  xserver-sdk-abi-requires
 
 # OpenGL compositing manager feature/optimization patches.
 # FIXME: who calls this?
@@ -90,38 +68,43 @@ Patch5002: xserver-1.4.99-ssh-isnt-local.patch
 # don't build the (broken) acpi code
 Patch6011: xserver-1.6.0-less-acpi-brokenness.patch
 
+# Make autoconfiguration chose nouveau driver for NVIDIA GPUs
+Patch6016: xserver-1.6.1-nouveau.patch
+
 # ajax needs to upstream this
 Patch6027: xserver-1.6.0-displayfd.patch
 Patch6030: xserver-1.6.99-right-of.patch
 #Patch6044: xserver-1.6.99-hush-prerelease-warning.patch
 
-# Fix libselinux-triggered build error
-# RedHat/Fedora-specific patch
-Patch7013: xserver-1.12-Xext-fix-selinux-build-failure.patch
+# Use vesa for VirtualBox, since we don't ship vboxvideo and the
+# fallback to vesa when module is missing seems broken
+Patch6053: xserver-1.8-disable-vboxvideo.patch
 
-# backport pci slot claiming fix for kms drivers
-Patch7015: xserver-fix-pci-slot-claims.patch
-# backport modesetting fallback driver
-Patch7016: xserver-1.12-modesetting-fallback.patch
-# needed when building without xorg (aka s390x)
-Patch7017: xserver-1.12.2-xorg-touch-test.patch
+# tests require Xorg
+Patch7007: xserver-1.10.99.1-test.patch
 
-# print newline on -displayfd (824594)
-Patch7018: xserver-1.12-os-print-newline-after-printing-display-name.patch
+# Multi-seat support through config/udev backend.
+# Submitted to upstream but not merged for 1.11
+Patch7009: xserver-1.10.99-config-add-udev-systemd-multi-seat-support.patch
 
-# send keycode/event type for slow keys enable (#816764)
-Patch7019: xserver-1.12-xkb-warn-if-XKB-SlowKeys-have-been-automatically-ena.patch
-Patch7020: xserver-1.12-xkb-fill-in-keycode-and-event-type-for-slow-keys-ena.patch
+# fdo Bug 44079 - XI2 FocusOut events missing parent of focus'd window
+Patch7010: 0001-dix-send-focus-events-to-the-immediate-parent-44079.patch
+Patch7011: 0001-dix-on-PointerRootWin-send-a-FocusIn-to-the-sprite-w.patch
+
+# Bug 754674 - F16 X hang due to frequent evdev mouse scrollwheel events
+Patch7012: 0001-os-log-Pull-LogMessageTypeVerbString-out-of-LogVMess.patch
+Patch7013: 0002-os-log-Add-LogVHdrMessageVerb-and-friends.patch
+Patch7014: 0003-xf86Helper-use-LogHdrMessageVerb-in-xf86VIDrvMsgVerb.patch
 
 # fix hotkeys on release, not press (#865)
 # https://bugs.freedesktop.org/show_bug.cgi?id=865
-Patch9990: xorg-server-1.12.2-xkb-switch-on-release.patch
+Patch9990: xorg-server-1.11.4-xkb-switch-on-release.patch
 
 %define moduledir	%{_libdir}/xorg/modules
 %define drimoduledir	%{_libdir}/dri
 %define sdkdir		%{_includedir}/xorg
 
-%ifarch s390 s390x %{?rhel:ppc ppc64}
+%ifarch s390 s390x
 %define with_hw_servers 0
 %else
 %define with_hw_servers 1
@@ -133,10 +116,6 @@ Patch9990: xorg-server-1.12.2-xkb-switch-on-release.patch
 %define enable_xorg --disable-xorg
 %endif
 
-%ifnarch %{ix86} x86_64 %{arm}
-%define no_int10 --disable-vbe --disable-int10-module
-%endif
-
 %define kdrive --enable-kdrive --enable-xephyr --disable-xfake --disable-xfbdev
 %define xservers --enable-xvfb --enable-xnest %{kdrive} %{enable_xorg}
 
@@ -145,7 +124,7 @@ BuildRequires: git-core
 BuildRequires: automake autoconf libtool pkgconfig
 BuildRequires: xorg-x11-util-macros >= 1.1.5
 
-BuildRequires: xorg-x11-proto-devel >= 7.6-20
+BuildRequires: xorg-x11-proto-devel >= 7.4-35
 BuildRequires: xorg-x11-font-utils >= 7.2-11
 
 BuildRequires: xorg-x11-xtrans-devel >= 1.2.2-1
@@ -162,7 +141,7 @@ BuildRequires: libXi-devel libXpm-devel libXaw-devel libXfixes-devel
 BuildRequires: libXv-devel
 
 BuildRequires: pixman-devel >= 0.21.8
-BuildRequires: libpciaccess-devel >= 0.12.901-1 openssl-devel byacc flex
+BuildRequires: libpciaccess-devel >= 0.10.6-1 openssl-devel byacc flex
 BuildRequires: mesa-libGL-devel >= 7.6-0.6
 # XXX silly...
 BuildRequires: libdrm-devel >= 2.4.0 kernel-headers
@@ -182,6 +161,7 @@ Summary: Xorg server common files
 Group: User Interface/X
 Requires: pixman >= 0.21.8
 Requires: xkeyboard-config xkbcomp
+Requires: libXfont >= 1.4.2
 
 %description common
 Common files shared among all X servers.
@@ -196,25 +176,11 @@ Provides: xserver-abi(ansic-%{ansic_major}) = %{ansic_minor}
 Provides: xserver-abi(videodrv-%{videodrv_major}) = %{videodrv_minor}
 Provides: xserver-abi(xinput-%{xinput_major}) = %{xinput_minor}
 Provides: xserver-abi(extension-%{extension_major}) = %{extension_minor}
-# Dropped from F17, use evdev
-Obsoletes: xorg-x11-drv-acecad <= 1.5.0-2.fc16
-Obsoletes: xorg-x11-drv-aiptek <= 1.4.1-2.fc16
-Obsoletes: xorg-x11-drv-elographics <= 1.3.0-2.fc16
-Obsoletes: xorg-x11-drv-fpit <= 1.4.0-2.fc16
-Obsoletes: xorg-x11-drv-hyperpen <= 1.4.1-2.fc16
-Obsoletes: xorg-x11-drv-mutouch <= 1.3.0-2.fc16
-Obsoletes: xorg-x11-drv-penmount <= 1.5.0-3.fc16
-%if 0%{?fedora} > 17
-# Dropped from F18, use a video card instead
-Obsoletes: xorg-x11-drv-ark <= 0.7.3-15.fc17
-Obsoletes: xorg-x11-drv-chips <= 1.2.4-8.fc18
-Obsoletes: xorg-x11-drv-s3 <= 0.6.3-14.fc17
-Obsoletes: xorg-x11-drv-tseng <= 1.2.4-12.fc17
-%endif
-
 
 Requires: xorg-x11-server-common >= %{version}-%{release}
+Requires: libdrm >= 2.4.20
 Requires: system-setup-keyboard
+Requires: udev >= 148-1
 
 %description Xorg
 X.org X11 is an open source implementation of the X Window System.  It
@@ -302,6 +268,11 @@ Requires: pkgconfig pixman-devel libpciaccess-devel
 # Virtual provide for transition.  Delete me someday.
 Provides: xorg-x11-server-sdk = %{version}-%{release}
 Provides: xorg-x11-server-static
+# XXX doublecheck me
+Provides: libxf86config = %{version}-%{release}
+Obsoletes: libxf86config < 1.6.99-29
+Provides: libxf86config-devel = %{version}-%{release}
+Obsoletes: libxf86config-devel < 1.6.99-29
 
 
 %description devel
@@ -322,8 +293,6 @@ Xserver source code needed to build VNC server (Xvnc)
 %prep
 %setup -q -n %{pkgname}-%{?gitdate:%{gitdate}}%{!?gitdate:%{version}}
 
-#%patch9990 -p1 -b .onrelease
-
 %if 0%{?gitdate}
 git checkout -b fedora
 sed -i 's/git/&+ssh/' .git/config
@@ -343,9 +312,9 @@ git commit -a -q -m "%{version} baseline."
 %endif
 
 # Apply all the patches.
-git am -p1 %{patches} < /dev/null
+git am -p1 %{patches}
 
-%if %{with_hw_servers} && !0%{?gitdate}
+%if %{with_hw_servers}
 # check the ABI in the source against what we expect.
 getmajor() {
     grep -i ^#define.ABI.$1_VERSION hw/xfree86/common/xf86Module.h |
@@ -357,7 +326,6 @@ getminor() {
     tr '(),' '   ' | awk '{ print $5 }'
 }
 
-
 test `getmajor ansic` == %{ansic_major}
 test `getminor ansic` == %{ansic_minor}
 test `getmajor videodrv` == %{videodrv_major}
@@ -368,7 +336,6 @@ test `getmajor extension` == %{extension_major}
 test `getminor extension` == %{extension_minor}
 
 %endif
-
 
 %build
 
@@ -385,19 +352,19 @@ test `getminor extension` == %{extension_minor}
 %endif
 
 # --with-pie ?
-autoreconf -f -v --install || exit 1
-# export CFLAGS="${RPM_OPT_FLAGS}"
+autoreconf --force -v --install || exit 1
+export CFLAGS="${RPM_OPT_FLAGS} -fno-omit-frame-pointer"
 %configure --enable-maintainer-mode %{xservers} \
 	--disable-static \
 	--with-pic \
-	%{?no_int10} --with-int10=x86emu \
+	--with-int10=x86emu \
 	--with-default-font-path=%{default_font_path} \
 	--with-module-dir=%{moduledir} \
 	--with-builderstring="Build ID: %{name} %{version}-%{release}" \
 	--with-os-name="$(hostname -s) $(uname -r)" \
 	--with-xkb-output=%{_localstatedir}/lib/xkb \
         --with-dtrace \
-	--disable-xaa \
+	--enable-install-libxf86config \
 	--enable-xselinux --enable-record \
 	--enable-config-udev \
 	%{dri_flags} %{?bodhi_flags} \
@@ -411,8 +378,10 @@ make install DESTDIR=$RPM_BUILD_ROOT moduledir=%{moduledir}
 
 %if %{with_hw_servers}
 rm -f $RPM_BUILD_ROOT%{_libdir}/xorg/modules/libxf8_16bpp.so
-rm -rf $RPM_BUILD_ROOT%{_libdir}/xorg/modules/multimedia/
 mkdir -p $RPM_BUILD_ROOT%{_libdir}/xorg/modules/{drivers,input}
+
+mkdir -p $RPM_BUILD_ROOT%{_datadir}/xorg
+install -m 0444 hw/xfree86/common/{vesa,extra}modes $RPM_BUILD_ROOT%{_datadir}/xorg/
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/pam.d
 install -m 644 %{SOURCE10} $RPM_BUILD_ROOT%{_sysconfdir}/pam.d/xserver
@@ -425,14 +394,7 @@ install -m 644 %{SOURCE4} $RPM_BUILD_ROOT%{_datadir}/X11/xorg.conf.d
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/X11/xorg.conf.d
 
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
-
-%if !0%{?gitdate} || %{stable_abi}
-install -m 755 %{SOURCE30} $RPM_BUILD_ROOT%{_bindir}/xserver-sdk-abi-requires
-%else
-sed -e s/@MAJOR@/%{gitdate}/g -e s/@MINOR@/%{minor_serial}/g %{SOURCE31} > \
-    $RPM_BUILD_ROOT%{_bindir}/xserver-sdk-abi-requires
-chmod 755 $RPM_BUILD_ROOT%{_bindir}/xserver-sdk-abi-requires
-%endif
+install -m 755 %{SOURCE30} $RPM_BUILD_ROOT%{_bindir}
 
 %endif
 
@@ -448,6 +410,7 @@ cp {,%{inst_srcdir}/}hw/dmx/doxygen/doxygen.conf.in
 cp {,%{inst_srcdir}/}xserver.ent.in
 cp xkb/README.compiled %{inst_srcdir}/xkb
 cp hw/xfree86/xorgconf.cpp %{inst_srcdir}/hw/xfree86
+cp hw/xfree86/common/{vesamodes,extramodes} %{inst_srcdir}/hw/xfree86/common
 
 install -m 0755 %{SOURCE20} $RPM_BUILD_ROOT%{_bindir}/xvfb-run
 
@@ -485,7 +448,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_localstatedir}/lib/xkb/README.compiled
 
 %if 1
-%define Xorgperms %attr(4755, root, root)
+%define Xorgperms %attr(4711, root, root)
 %else
 # disable until module loading is audited
 %define Xorgperms %attr(0711,root,root) %caps(cap_sys_admin,cap_sys_rawio,cap_dac_override=pe)
@@ -499,6 +462,9 @@ rm -rf $RPM_BUILD_ROOT
 %{Xorgperms} %{_bindir}/Xorg
 %{_bindir}/cvt
 %{_bindir}/gtf
+%dir %{_datadir}/xorg
+%{_datadir}/xorg/vesamodes
+%{_datadir}/xorg/extramodes
 %dir %{_libdir}/xorg
 %dir %{_libdir}/xorg/modules
 %dir %{_libdir}/xorg/modules/drivers
@@ -511,16 +477,23 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/xorg/modules/extensions/librecord.so
 %dir %{_libdir}/xorg/modules/input
 %{_libdir}/xorg/modules/libfbdevhw.so
+%dir %{_libdir}/xorg/modules/multimedia
+%{_libdir}/xorg/modules/multimedia/bt829_drv.so
+%{_libdir}/xorg/modules/multimedia/fi1236_drv.so
+%{_libdir}/xorg/modules/multimedia/msp3430_drv.so
+%{_libdir}/xorg/modules/multimedia/tda8425_drv.so
+%{_libdir}/xorg/modules/multimedia/tda9850_drv.so
+%{_libdir}/xorg/modules/multimedia/tda9885_drv.so
+%{_libdir}/xorg/modules/multimedia/uda1380_drv.so
 %{_libdir}/xorg/modules/libexa.so
 %{_libdir}/xorg/modules/libfb.so
+%{_libdir}/xorg/modules/libint10.so
 %{_libdir}/xorg/modules/libshadow.so
 %{_libdir}/xorg/modules/libshadowfb.so
+%{_libdir}/xorg/modules/libvbe.so
 %{_libdir}/xorg/modules/libvgahw.so
 %{_libdir}/xorg/modules/libwfb.so
-%ifarch %{ix86} x86_64 %{arm}
-%{_libdir}/xorg/modules/libint10.so
-%{_libdir}/xorg/modules/libvbe.so
-%endif
+%{_libdir}/xorg/modules/libxaa.so
 %{_mandir}/man1/gtf.1*
 %{_mandir}/man1/Xorg.1*
 %{_mandir}/man1/cvt.1*
@@ -582,6 +555,7 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_includedir}/xorg
 %{sdkdir}/*.h
 %{_datadir}/aclocal/xorg-server.m4
+%{_libdir}/libxf86config.a
 %endif
 
 
@@ -590,132 +564,43 @@ rm -rf $RPM_BUILD_ROOT
 %{xserver_source_dir}
 
 %changelog
-* Mon Jul 16 2012 Arkady L. Shane <ashejn@russianfedora.ru> 1.12.2-4.R
+* Mon Jul 16 2012 Arkady L. Shane <ashejn@russianfedora.ru> 1.11.4-3.R
 - fix hotkeys on release, not press (#865)
   https://bugs.freedesktop.org/show_bug.cgi?id=865
 
-* Tue Jun 26 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.12.2-4
-- send keycode/event type down the wire when SlowKeys enable, otherwise
-  GNOME won't warn about it (#816764)
+* Tue Mar 27 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.4-3
+- Re-do xf86IDrvMsg() logging to avoid spurious malloc during signal
+  handlers (#754674)
 
-* Thu Jun 21 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.12.2-3
-- print newline after printing $DISPLAY to -displayfd (#824594)
+* Fri Mar 09 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.4-2
+- Fix fdo bug 44079, XI2 focus events missing on immediate parent of the
+  focus window
 
-* Fri Jun 15 2012 Dan Horák <dan[at]danny.cz> 1.12.2-2
-- fix build without xorg (aka s390x)
+* Thu Feb 09 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.4-1
+- xserver 1.11.4
+- xserver-1.11.2-record-crasher.patch: drop, 53e347b22bb7
+- xserver-1.11.2-dix-button-state-must-show-the-logical-buttons-not-p.patch:
+  drop, 4b3866102
 
-* Wed May 30 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.12.2-1
-- xserver 1.12.2
+* Mon Dec 19 2011 Peter Hutterer <peter.hutterer@redhat.com> 1.11.3-1
+- xserver 1.11.3
+- xserver-1.11.2-dix-button-state-must-show-the-logical-buttons-not-p.patch:
+  XI2 button state was wrong
 
-* Fri May 25 2012 Dave Airlie <airlied@redhat.com> 1.12.1-2
-- xserver-fix-pci-slot-claims.patch: backport slot claiming fix from master
-- xserver-1.12-modesetting-fallback.patch: add modesetting to fallback list
+* Thu Dec 15 2011 Adam Jackson <ajax@redhat.com> 1.11.2.902-1
+- xserver 1.11.3 RC3
+- 0001-Xi-allow-passive-keygrabs-on-the-XIAll-Master-Device.patch,
+  0001-dix-block-signals-when-closing-all-devices.patch: Drop, merged.
 
-* Mon May 14 2012 Peter Hutterer <peter.hutterer@redhat.com>
-- Drop xserver-1.10.99.1-test.patch:
-  cd89482088f71ed517c2e88ed437e4752070c3f4 fixed it
+* Thu Nov 10 2011 Adam Jackson <ajax@redhat.com> 1.11.2-3
+- xserver-1.11.2-record-crasher.patch: Fix a crash in DRI2. (#714746)
 
-* Mon May 14 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.12.1-1
-- server 1.12.1
-- force autoreconf to avoid libtool errors
-- update patches for new indentation style.
-
-* Mon May 14 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.12.0-6
-- Make timers signal-safe (#814869)
-
-* Sun May 13 2012 Dennis Gilmore <dennis@ausil.us> 1.12.0-5
-- enable vbe on arm arches
-
-* Thu Apr 26 2012 Adam Jackson <ajax@redhat.com> 1.12.0-4
-- Obsolete some old video drivers in F18+
-
-* Wed Mar 21 2012 Adam Jackson <ajax@redhat.com> 1.12.0-3
-- Tweak arches for RHEL
-
-* Wed Mar 14 2012 Adam Jackson <ajax@redhat.com> 1.12.0-2
-- Install Xorg mode 4755, there's no security benefit to 4711. (#712432)
-
-* Mon Mar 05 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.12.0-1
-- xserver 1.12
-- xserver-1.12-dix-reset-last.scroll-when-resetting-the-valuator-45.patch:
-  drop, 6f2838818
-
-* Thu Feb 16 2012 Adam Jackson <ajax@redhat.com> 1.11.99.903-2.20120215
-- Don't pretend int10 is a thing on non-PC arches
-
-* Thu Feb 16 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.99.903-1.20120215
-- Server version is 1.11.99.903 now, use that.
-
-* Wed Feb 15 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.99.901-7.20120215
-- Today's git snapshot
-
-* Sun Feb 12 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.99.901-6.20120124
-- Fix installation of xserver-sdk-abi-requires script, if stable_abi is set
-  always install the relese one, not the git one
-
-* Sat Feb 11 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.99.901-5.20120124
-- ABI is considered stable now:
-  video 12.0, input 16.0, extension 6.0, font 0.6, ansic 0.4
-
-* Sat Feb 11 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.99.901-4.20120124
-- xserver-1.12-dix-reset-last.scroll-when-resetting-the-valuator-45.patch:
-  reset last.scroll on the device whenever the slave device switched to
-  avoid jumps during scrolling (#788632).
-
-* Tue Jan 24 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.99.901-3.20120124
-- Today's git snapshot
-- xserver-1.12-xaa-sdk-headers.patch: drop, a55214d11916b
-
-* Wed Jan 04 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.99.901-2.20120103
-- xserver-1.12-Xext-fix-selinux-build-failure.patch: fix build error
-  triggered by Red Hat-specific patch to libselinux
-
-* Tue Jan 03 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.11.99.901-1.20120103
-- Git snapshot 98cde254acb9b98337ddecf64c138d38c14ec2bf
-- xserver-1.11.99-optionstr.patch: drop
-- 0001-Xext-don-t-swap-CARD8-in-SProcSELinuxQueryVersion.patch: drop
-
-* Fri Dec 16 2011 Adam Jackson <ajax@redhat.com> 1.11.99.1-11
-- Always install XAA SDK headers so drivers still build
-
-* Thu Dec 15 2011 Adam Jackson <ajax@redhat.com> 1.11.99.1-10
-- --disable-xaa
-
-* Thu Dec 01 2011 Adam Jackson <ajax@redhat.com> 1.11.99.1-9
-- xserver-1.8-disable-vboxvideo.patch: Drop, should be fixed now
-- Drop vesamodes and extramodes, rhpxl is no more
-- Stop building libxf86config, pyxf86config will be gone soon
-
-* Tue Nov 29 2011 Dave Airlie <airlied@redhat.com> 1.11.99.1-8
-- put optionstr.h into devel package
-
-* Mon Nov 21 2011 Adam Jackson <ajax@redhat.com> 1.11.99.1-7
-- Restore DRI1 until drivers are properly prepared for it
-
-* Thu Nov 17 2011 Adam Jackson <ajax@redhat.com> 1.11.99.1-6
-- Disable DRI1
-
-* Wed Nov 16 2011 Adam Jackson <ajax@redhat.com> 1.11.99.1-5
-- Obsolete some dead input drivers.
-
-* Mon Nov 14 2011 Adam Jackson <ajax@redhat.com> 1.11.99.1-3
-- Fix permissions on abi script when doing git snapshots
-
-* Wed Nov 09 2011 Peter Hutterer <peter.hutterer@redhat.com>  1.11.99.1-1.20111109
-- Update to today's git snapshot
-- xserver-1.6.1-nouveau.patch: drop, upstream
-- xserver-1.10.99-config-add-udev-systemd-multi-seat-support.patch: drop,
-  upstream
-- 0001-dix-block-signals-when-closing-all-devices.patch: drop, upstream
-
-* Wed Nov 09 2011 Adam Jackson <ajax@redhat.com>
-- Change the ABI magic for snapshots
-
-* Mon Oct 24 2011 Peter Hutterer <peter.hutterer@redhat.com> 1.11.1-2
+* Wed Nov 09 2011 Peter Hutterer <peter.hutterer@redhat.com> 1.11.2-2
 - Block signals when removing all input devices #737031
 
-* Thu Oct 13 2011 Adam Jackson <ajax@redhat.com>
-- Drop some Requires >= on things where we had newer versions in F14.
+* Sat Nov 05 2011 Peter Hutterer <peter.hutterer@redhat.com> 1.11.2-1
+- xserver-1.11.2
+- Fix for #751491, enabling passive key grabs on XIAllMasterDevices
 
 * Mon Sep 26 2011 Adam Jackson <ajax@redhat.com> 1.11.1-1
 - xserver 1.11.1
