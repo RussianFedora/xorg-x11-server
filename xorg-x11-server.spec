@@ -590,6 +590,10 @@ rm -rf $RPM_BUILD_ROOT
 %{xserver_source_dir}
 
 %changelog
+* Mon Jul 16 2012 Arkady L. Shane <ashejn@russianfedora.ru> 1.12.2-4.R
+- fix hotkeys on release, not press (#865)
+  https://bugs.freedesktop.org/show_bug.cgi?id=865
+
 * Tue Jun 26 2012 Peter Hutterer <peter.hutterer@redhat.com> 1.12.2-4
 - send keycode/event type down the wire when SlowKeys enable, otherwise
   GNOME won't warn about it (#816764)
